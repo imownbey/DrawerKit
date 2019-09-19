@@ -16,6 +16,7 @@ extension PresentationController {
         NotificationCenter.default.post(notification: DrawerNotification.drawerExteriorTapped)
         tapGesture.isEnabled = false
         animateTransition(to: .dismissed)
+        animateDimming(to: 0)
     }
 
     @objc func handleDrawerDrag() {
@@ -24,12 +25,23 @@ extension PresentationController {
         switch panGesture.state {
         case .began:
             startingDrawerStateForDrag = targetDrawerState
+            if(startingDrawerStateForDrag != .fullyExpanded){
+                animationPosition = currentDrawerY
+            }
             fallthrough
 
         case .changed:
             applyTranslationY(panGesture.translation(in: view).y)
             panGesture.setTranslation(.zero, in: view)
 
+            var height = (currentDrawerY - animationPosition) / (view.frame.height - lowerMarkGap - animationPosition)
+            if height < 0 { height = 1 } else { height = 1 - height}
+            if(currentDrawerState == .fullyExpanded)
+            {
+                animateDimming(to: 1)
+            }else{
+                animateDimming(to: height)
+            }
         case .ended:
             let drawerSpeedY = panGesture.velocity(in: view).y / containerViewHeight
             let endingState = GeometryEvaluator.nextStateFrom(
@@ -43,10 +55,14 @@ extension PresentationController {
             )
             animateTransition(to: endingState)
 
+            let percent = CGFloat( (endingState == .collapsed || endingState == .dismissed) ? 0 : 1)
+            animateDimming(to: percent)
         case .cancelled:
             if let startingState = startingDrawerStateForDrag {
                 startingDrawerStateForDrag = nil
                 animateTransition(to: startingState)
+                let percent = CGFloat( (startingState == .collapsed) ? 0 : 1)
+                animateDimming(to: percent)
             }
 
         default:
